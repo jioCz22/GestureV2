@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#070916">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="GestureChallenge: aprende y practica el alfabeto manual de la Lengua de Señas Mexicana.">
+  <title>GestureChallenge | Aprende LSM</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- El detector de manos se descarga solo al usarlo; esto adelanta la conexión -->
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="dns-prefetch" href="https://storage.googleapis.com">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <!-- ENCABEZADO -->
+  <header class="topbar">
+    <div class="topbar-in">
+      <div class="brand">
+        <div class="brand-icon">G</div>
+        <div>
+          <h1>GestureChallenge</h1>
+          <p>APRENDE · PRACTICA · COMUNICA</p>
+        </div>
+      </div>
+
+      <!-- Resumen compacto (solo móvil y tableta) -->
+      <div class="topstats" aria-label="Tu progreso">
+        <span title="Puntos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg><b id="mbPoints">0</b></span>
+        <span title="Racha de días"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z"/></svg><b id="mbStreak">0</b></span>
+        <span title="Avance total"><b id="mbPct">0%</b></span>
+      </div>
+
+            <div class="top-actions">
+        <button class="secondary-btn" id="openAccount" type="button">Cuenta</button>
+        <button class="secondary-btn" id="openSettings" type="button">⚙ Ajustes</button>
+      </div>
+    </div>
+    <div class="topbar-bar" aria-hidden="true"><i id="mbBar"></i></div>
+  </header>
+
+  <div class="app">
+    <div class="layout">
+
+      <!-- MENÚ LATERAL (escritorio) -->
+      <aside class="sidebar">
+        <p class="side-label">MENÚ PRINCIPAL</p>
+
+        <nav aria-label="Secciones">
+          <button class="nav-btn active" data-view="learn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11"/></svg>Aprender</button>
+          <button class="nav-btn" data-view="stats" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V4M16 20v-7M2 20h20"/></svg>Estadísticas</button>
+          <button class="nav-btn" data-view="guide" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>Alfabeto LSM</button>          <button class="nav-btn" data-view="community" type="button">Comunidad</button>
+          <button class="nav-btn" data-view="leaderboard" type="button">Clasificación</button>
+          <button class="nav-btn" data-view="lab" type="button">Laboratorio</button>
+          <button class="nav-btn" data-view="shop" type="button">Tienda y avatar</button>
+          <button class="nav-btn" data-view="challenges" type="button">Desafíos</button>
+          <button class="nav-btn" data-view="profile" type="button">Perfil</button>
+        </nav>
+
+        <div class="sidebar-progress">
+          <strong>Tu progreso</strong>
+          <div class="sb-pct"><span id="overallTxt">0%</span><small>completado</small></div>
+          <div class="progress-track"><div class="progress-fill" id="overallBar"></div></div>
+          <div class="sb-tiles">
+            <div class="t-pts"><i class="si"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg></i><b id="sbPoints">0</b><span>Puntos</span></div>
+            <div class="t-streak"><i class="si"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z"/></svg></i><b id="sbStreak">0</b><span>Racha</span></div>
+            <div class="t-let"><i class="si"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg></i><b id="sbLetters">0/26</b><span>Letras</span></div>
+            <div class="t-lvl"><i class="si"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg></i><b id="sbLevels">0/15</b><span>Niveles</span></div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- CONTENIDO PRINCIPAL -->
+      <main class="main">
+
+        <!-- VISTA: APRENDER -->
+        <section class="view active" id="view-learn">
+
+          <div class="welcome">
+            <div>
+              <h2>Aprender</h2>
+              <p>Practica a tu ritmo: haz la seña y la app avanza sola.</p>
+            </div>
+            <span class="stage-pill" id="stageName">Etapa 1 · Letras</span>
+          </div>
+
+          <div class="howto" aria-label="Cómo funciona">
+            <div><b>1</b><span>Pulsa <strong>Iniciar nivel</strong> y acepta el permiso de la cámara</span></div>
+            <div><b>2</b><span>Pon tu mano frente a la cámara y haz la letra de la referencia</span></div>
+            <div><b>3</b><span>Mantén la posición: al salir ✓ pasa sola a la siguiente</span></div>
+          </div>
+
+          <!-- NIVELES -->
+          <section class="panel">
+            <div class="panel-heading">
+              <h3>Tu recorrido</h3>
+              <span class="muted">15 niveles</span>
+            </div>
+            <div id="levels"></div>
+          </section>
+
+          <!-- LECCIÓN -->
+          <section class="panel lesson-scroll" id="lessonMain">
+            <div class="lesson-header">
+              <h2 id="levelTitle">Primeras letras</h2>
+              <p id="goal">Practica las letras del nivel.</p>
+            </div>
+
+            <div class="progress-track level-track">
+              <div class="progress-fill" id="levelBar"></div>
+            </div>
+
+            <div class="panel-heading">
+              <h3>Contenido del nivel</h3>
+              <span class="muted" id="itemCount">0 elementos</span>
+            </div>
+
+            <div class="lesson-grid">
+
+              <!-- OBJETIVO Y REFERENCIA -->
+              <div class="lesson-ref">
+                <div class="target-card">
+                  <div class="target-letter" id="target">A</div>
+                  <p class="target-caption">Forma la seña correspondiente</p>
+                  <p id="camTarget"></p>
+                </div>
+
+                <div class="panel ref-panel" id="refPanel">
+                  <div class="panel-heading">
+                    <h3>Referencia visual</h3>
+                  </div>
+                  <div id="refBox">
+                    <div class="reference-placeholder">La referencia aparecerá aquí.</div>
+                  </div>
+                </div>
+
+                <p class="muted ref-desc" id="refDesc">Consulta la referencia antes de practicar.</p>
+              </div>
+
+              <!-- CÁMARA -->
+              <div class="lesson-cam">
+                <div class="panel-heading">
+                  <h3>Práctica con cámara</h3>
+                  <span class="muted" id="timer">--:--</span>
+                </div>
+
+                <div class="camera-box" id="camBox">
+                  <video id="camera" autoplay playsinline muted style="display:none;"></video>
+                  <canvas id="overlay"></canvas>
+                  <div class="hand-guide" id="handGuide" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5V4a1.5 1.5 0 0 1 3 0v5.5m0-3a1.5 1.5 0 0 1 3 0V13m0-3.5a1.5 1.5 0 0 1 3 0V15a7 7 0 0 1-7 7h-1a7 7 0 0 1-5.6-2.8L4 15.5a1.5 1.5 0 0 1 2.4-1.8L8 15.5"/></svg>
+                    <span>Coloca tu mano aquí</span>
+                  </div>
+                  <div class="ref-float" id="refFloat" role="button" tabindex="0" title="Toca para ampliar o reducir la referencia" aria-label="Referencia de la seña. Toca para ampliar o reducir"></div>
+                  <div class="cam-badge" id="camBadge">Cámara apagada</div>
+                  <div class="cam-letter" id="camLetter"></div>
+                  <div class="cam-hint" id="camHint" aria-hidden="true"></div>
+                  <div class="cam-fx" id="camFx" aria-hidden="true"></div>
+                  <div id="cameraEmpty">
+                    <strong>Tu cámara está apagada</strong>
+                    <p>Toca <b>Iniciar nivel</b> y acepta el permiso del navegador. Después coloca tu mano frente a la cámara.</p>
+                    <button class="primary-btn" id="camStart" type="button">▶ Iniciar nivel</button>
+                  </div>
+                </div>
+
+                <div class="camera-status">
+                  <span id="camStatus">Cámara desconectada</span>
+                  <span id="handState">Mano no detectada</span>
+                </div>
+
+                <div class="progress-track hold-track"><div class="progress-fill" id="holdBar"></div></div>
+
+                <div class="camera-actions">
+                  <button class="primary-btn" id="camToggle" type="button">Activar cámara</button>
+                  <button class="primary-btn" id="autoBtn" type="button">▶ Iniciar nivel</button>
+                  <button class="secondary-btn" id="startBtn" type="button">Práctica manual</button>
+                </div>
+
+                <div class="feedback" id="feedback" aria-live="polite">Selecciona un contenido para comenzar.</div>
+
+                <div class="eval-actions" id="evalBox">
+                  <button class="success-btn" id="evalYes" type="button">✓ Lo conseguí</button>
+                  <button class="danger-btn" id="evalNo" type="button">Volver a intentar</button>
+                </div>
+
+                <div class="camera-actions">
+                  <button class="secondary-btn" id="restartBtn" type="button">↻ Reiniciar nivel</button>
+                  <button class="secondary-btn" id="quizBtn" type="button">Evaluación del nivel</button>
+                  <button class="secondary-btn" id="listenBtn" type="button">Escuchar</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- PASOS -->
+            <section class="sub">
+              <div class="panel-heading"><h3>Consejos para practicar</h3></div>
+              <div class="steps" id="steps"></div>
+            </section>
+
+            <!-- LISTA DE ELEMENTOS -->
+            <section class="sub">
+              <div class="panel-heading"><h3>Elementos del nivel</h3></div>
+              <div class="item-list" id="itemList"></div>
+            </section>
+          </section>
+
+          <!-- CUESTIONARIO -->
+          <section class="panel" id="quizBox" hidden>
+            <div class="panel-heading">
+              <h3>Evaluación del nivel</h3>
+              <span class="muted">Comprueba lo aprendido</span>
+            </div>
+            <div id="quizContent"></div>
+          </section>
+
+        </section>
+
+        <!-- VISTA: ESTADÍSTICAS -->
+        <section class="view" id="view-stats">
+          <div class="welcome">
+            <div>
+              <h2>Tu rendimiento</h2>
+              <p>Consulta tus avances y logros de aprendizaje.</p>
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <i class="si"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></i><span>Contenidos completados</span>
+              <strong id="statCompleted">0</strong>
+            </div>
+            <div class="stat-card">
+              <i class="si"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg></i><span>Niveles superados</span>
+              <strong id="statLevels">0</strong>
+            </div>
+            <div class="stat-card">
+              <i class="si"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg></i><span>Puntos acumulados</span>
+              <strong id="statPoints">0</strong>
+            </div>
+            <div class="stat-card">
+              <i class="si"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z"/></svg></i><span>Racha actual</span>
+              <strong id="statStreak">0</strong>
+            </div>
+            <div class="stat-card">
+              <i class="si"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg></i><span>Letras aprendidas</span>
+              <strong id="statLetters">0</strong>
+            </div>
+            <div class="stat-card">
+              <i class="si"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V5h16v2M12 5v14M9 19h6"/></svg></i><span>Palabras practicadas</span>
+              <strong id="statWords">0</strong>
+            </div>
+          </div>
+
+          <section class="panel">
+            <div class="panel-heading"><h3>Insignias</h3></div>
+            <div class="badge-grid" id="badges"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading"><h3>Actividad reciente</h3></div>
+            <div class="history-list" id="history"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading"><h3>Progreso por nivel</h3></div>
+            <div id="levelStats"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading"><h3>Dominio por letra</h3></div>
+            <div class="mastery" id="mastery"></div>
+          </section>
+          <section class="panel" id="assessmentPanel"><div class="panel-heading"><h3>Evaluación de precisión</h3><button class="primary-btn" id="startAssessment" type="button">Iniciar evaluación</button></div><p class="muted">Identifica diez referencias del alfabeto manual. La puntuación se calcula en el servidor.</p><div id="assessmentQuestions" class="assessment-grid"></div><div class="camera-actions"><button class="secondary-btn" id="submitAssessment" type="button" disabled>Enviar respuestas</button></div><p id="assessmentResult" class="account-feedback" role="status"></p></section>
+        </section>
+
+        <!-- VISTA: GUÍA -->
+        <section class="view" id="view-guide">
+          <div class="welcome">
+            <div>
+              <h2>Alfabeto manual LSM</h2>
+              <p>Explora las letras y consulta sus referencias visuales.</p>
+            </div>
+          </div>
+
+          <section class="panel guide-panel">
+            <div class="panel-heading">
+              <h3>Selecciona una letra</h3>
+              <span class="muted" id="guideCount">26 letras</span>
+            </div>
+            <div class="alphabet-grid" id="alphabetGrid"></div>
+            <div class="guide-detail" id="guideDetail">Selecciona una letra para consultar su información.</div>
+          </section>
+        </section>
+
+        <!-- VISTA: COMUNIDAD -->
+        <section class="view" id="view-community">
+          <div class="welcome"><div><h2>Comunidad</h2><p>Explora etapas creadas por jugadores y revisadas antes de publicarse.</p><p class="muted" role="note">Módulo experimental · pendiente de validación.</p></div></div>
+          <section class="panel"><div class="panel-heading"><h3>Explorador de etapas</h3><select id="stageSort"><option value="recent">Recientes</option><option value="popular">Populares</option><option value="rated">Mejor valoradas</option><option value="recommended">Recomendadas</option></select></div><div class="filter-row"><select id="stageCategory"><option value="">Todas las categorías</option><option value="alfabeto">Alfabeto</option><option value="palabras">Palabras</option><option value="frases">Frases</option><option value="vocabulario">Vocabulario</option></select><select id="stageDifficulty"><option value="">Cualquier dificultad</option><option value="1">1 · Inicial</option><option value="2">2</option><option value="3">3 · Intermedia</option><option value="4">4</option><option value="5">5 · Avanzada</option></select><button class="secondary-btn" id="refreshStages" type="button">Actualizar</button></div><div class="feature-grid" id="communityStages"></div></section><section class="panel"><div class="panel-heading"><h3>Mis favoritas</h3><button class="secondary-btn" id="refreshFavorites" type="button">Actualizar</button></div><div class="feature-grid" id="favoriteStages"></div></section>
+        </section>
+        <!-- VISTA: CLASIFICACIÓN -->
+        <section class="view" id="view-leaderboard">
+          <div class="welcome"><div><h2>Clasificación</h2><p>Ordenada por experiencia registrada en el servidor.</p><p class="muted" role="note">Módulo experimental · pendiente de validación.</p></div></div>
+          <section class="panel"><div class="panel-heading"><h3>Aprendizaje</h3><select id="rankMetric"><option value="experience">Experiencia</option><option value="precision">Precisión evaluada</option><option value="mastery">Contenidos completados</option><option value="consistency">Constancia</option><option value="weekly_activity">Actividad semanal</option></select><div class="toggle-row"><button class="chip active" data-rank-period="false" type="button">Histórica</button><button class="chip" data-rank-period="true" type="button">Últimos 7 días</button></div></div><div class="table-scroll"><table class="rank-table"><thead><tr><th>Posición</th><th>Jugador</th><th id="rankScoreHeader">XP</th></tr></thead><tbody id="leaderboardRows"></tbody></table></div></section>
+        </section>
+        <!-- VISTA: LABORATORIO -->
+        <section class="view" id="view-lab">
+          <div class="welcome"><div><h2>Laboratorio de etapas</h2><p>Crea una etapa de aprendizaje y envíala a revisión antes de publicarla.</p><p class="muted" role="note">Módulo experimental · pendiente de validación.</p></div></div>
+          <section class="panel"><div class="panel-heading"><h3>Nueva etapa</h3></div><form id="stageForm" class="feature-form"><label>Nombre<input id="stageTitle" maxlength="60" required></label><label>Descripción<textarea id="stageDescription" maxlength="500" rows="3"></textarea></label><div class="form-row"><label>Categoría<select id="stageCategoryInput"><option value="alfabeto">Alfabeto</option><option value="palabras">Palabras</option><option value="frases">Frases</option><option value="vocabulario">Vocabulario</option></select></label><label>Dificultad<select id="stageDifficultyInput"><option value="1">1 · Inicial</option><option value="2">2</option><option value="3">3 · Intermedia</option><option value="4">4</option><option value="5">5 · Avanzada</option></select></label></div><label>Indicaciones de práctica<small>Una indicación por línea, entre 2 y 20. No incluyas datos privados ni enlaces.</small><textarea id="stagePrompts" rows="6" required placeholder="Practica la letra A&#10;Compara la posición de tus dedos"></textarea></label><button class="primary-btn" type="submit">Guardar borrador</button></form></section>
+          <section class="panel"><div class="panel-heading"><h3>Mis etapas</h3><button class="secondary-btn" id="refreshMyStages" type="button">Actualizar</button></div><div id="myStages"></div></section>
+          <section class="panel" id="moderationPanel" hidden><div class="panel-heading"><h3>Cola de moderación</h3></div><div id="moderationQueue"></div></section>
+        </section>
+        <!-- VISTA: TIENDA Y AVATAR -->
+        <section class="view" id="view-shop">
+          <div class="welcome"><div><h2>Tienda y avatar</h2><p>Personaliza tu personaje 2D y usa tus monedas para desbloquear artículos.</p><p class="muted" role="note">Módulo experimental · pendiente de validación.</p></div><span class="stage-pill">◉ <b id="coinBalance">0</b> monedas</span></div>
+          <section class="panel avatar-panel"><div class="panel-heading"><h3>Tu personaje</h3><button class="secondary-btn" id="refreshAvatar" type="button">Actualizar</button></div><div id="avatarPreview" class="avatar-preview" aria-label="Vista previa del avatar"></div></section>
+          <section class="panel"><div class="panel-heading"><h3>Catálogo</h3><select id="avatarCategory"><option value="">Todas las categorías</option><option value="skin">Tono</option><option value="hair">Cabello</option><option value="top">Prendas</option><option value="bottom">Pantalones</option><option value="shoes">Calzado</option><option value="accessory">Accesorios</option><option value="background">Fondos</option></select></div><div class="feature-grid" id="avatarCatalog"></div></section>
+          <section class="panel"><div class="panel-heading"><h3>Misión diaria</h3></div><div id="dailyMission" class="mission-card"></div><button class="primary-btn" id="claimMission" type="button">Reclamar recompensa</button></section>
+        </section>
+        <!-- VISTA: DESAFÍOS -->
+        <section class="view" id="view-challenges">
+          <div class="welcome"><div><h2>Desafíos</h2><p>Invita a otro jugador a practicar las mismas actividades y compara resultados registrados.</p><p class="muted" role="note">Módulo experimental · pendiente de validación.</p></div></div>
+          <section class="panel"><div class="panel-heading"><h3>Crear desafío</h3></div><form id="challengeForm" class="feature-form"><label>Nombre de jugador<input id="challengeOpponent" maxlength="20" required></label><label>Actividades (por ejemplo: letter:A,letter:B,word:HOLA)<input id="challengeActivities" required value="letter:A,letter:B,letter:C"></label><button class="primary-btn" type="submit">Crear invitación</button></form><div id="createdChallenge" class="mission-card" hidden></div></section>
+          <section class="panel"><div class="panel-heading"><h3>Unirme con código</h3></div><form id="joinChallengeForm" class="feature-form"><label>Código<input id="challengeCode" maxlength="10" required></label><button class="secondary-btn" type="submit">Unirme</button></form></section>
+          <section class="panel"><div class="panel-heading"><h3>Mis desafíos</h3><button class="secondary-btn" id="refreshChallenges" type="button">Actualizar</button></div><div id="challengeList"></div></section>
+        </section>
+        <!-- VISTA: PERFIL -->
+        <section class="view" id="view-profile">
+          <div class="welcome"><div><h2>Perfil público</h2><p>Controla qué información de aprendizaje puede ver la comunidad.</p><p class="muted" role="note">Módulo experimental · pendiente de validación.</p></div></div>
+          <section class="panel"><div class="panel-heading"><h3>Privacidad</h3></div><label class="setting-row"><span>Mostrar mi perfil en la comunidad</span><input type="checkbox" id="settingShowProfile" checked></label><label class="setting-row"><span>Mostrar mi experiencia en clasificaciones</span><input type="checkbox" id="settingShowXp" checked></label><label class="setting-row"><span>Mostrar mi actividad reciente</span><input type="checkbox" id="settingShowActivity"></label><p id="profileSummary" class="muted"></p></section>
+          <section class="panel"><div class="panel-heading"><h3>Logros</h3></div><div id="achievementList" class="feature-grid"></div></section>
+          <section class="panel"><div class="panel-heading"><h3>Estadísticas de creador</h3></div><div id="creatorStats" class="feature-grid"></div></section>
+        </section>      </main>
+    </div>
+  </div>
+
+  <!-- BARRA INFERIOR (móvil y tableta) -->
+  <nav class="tabbar" aria-label="Navegación principal">
+    <button class="tab active" data-view="learn" type="button">
+      <span class="pill"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11"/></svg></span><span>Aprender</span>
+    </button>
+    <button class="tab" data-view="stats" type="button">
+      <span class="pill"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V4M16 20v-7M2 20h20"/></svg></span><span>Progreso</span>
+    </button>
+    <button class="tab" data-view="guide" type="button">
+      <span class="pill"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg></span><span>Alfabeto</span>
+    </button>    <button class="tab" data-view="community" type="button"><span class="pill">◇</span><span>Comunidad</span></button>
+    <button class="tab" data-view="leaderboard" type="button"><span class="pill">♜</span><span>Ranking</span></button>
+    <button class="tab" data-view="lab" type="button"><span class="pill">✎</span><span>Laboratorio</span></button>
+    <button class="tab" data-view="shop" type="button"><span class="pill">◈</span><span>Tienda</span></button>
+    <button class="tab" data-view="challenges" type="button"><span class="pill">⚔</span><span>Desafíos</span></button>
+    <button class="tab" data-view="profile" type="button"><span class="pill">●</span><span>Perfil</span></button>
+    <button class="tab" id="tabSettings" type="button">
+      <span class="pill"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span><span>Ajustes</span>
+    </button>
+    <button class="tab" id="tabAccount" type="button"><span class="pill"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><span>Cuenta</span></button>
+  </nav>
+
+  <!-- CONFIGURACIÓN -->
+  <dialog id="settings" aria-labelledby="settingsTitle">
+    <div class="panel-heading"><h3 id="settingsTitle">Ajustes</h3><button class="icon-btn" id="closeSettings" type="button" aria-label="Cerrar">✕</button></div>
+    <h4>CÁMARA Y DETECCIÓN</h4>
+    <label class="setting-row"><span>Detector de manos<small>Necesario para «Iniciar nivel»</small></span><input type="checkbox" id="optLandmarks"></label>
+    <label class="setting-row"><span>Mostrar puntos de la mano<small>Dibuja el esqueleto sobre la cámara</small></span><input type="checkbox" id="optOverlay"></label>
+    <label class="setting-row"><span>Tiempo para mantener la seña<small>Más lento = menos falsos avances</small></span><select id="optHold"><option value="600">Rápido</option><option value="900">Normal</option><option value="1300">Lento</option></select></label>
+    <label class="setting-row"><span>Exigencia de la detección<small>Estricta pide una forma más exacta</small></span><select id="optTol"><option value="0">Estricta</option><option value="0.5">Normal</option><option value="1">Flexible</option></select></label>
+    <h4>APRENDIZAJE</h4>
+    <label class="setting-row"><span>Sonido y vibración</span><input type="checkbox" id="soundToggle"></label>
+    <label class="setting-row"><span>Volumen de los sonidos<small>Sube el volumen si lo usas en un salón</small></span><select id="optVol"><option value="0.5">Suave</option><option value="0.9">Normal</option><option value="1.6">Fuerte</option></select></label>
+    <label class="setting-row"><span>Pasar al siguiente nivel automáticamente<small>Al superar un nivel</small></span><input type="checkbox" id="optAutoNext"></label>
+    <h4>DATOS</h4>
+    <div class="camera-actions"><button class="secondary-btn" id="resetSettings" type="button">Restablecer ajustes</button><button class="danger-btn" id="clearProgress" type="button">Borrar todo mi progreso</button></div>
+  </dialog>
+
+  <dialog id="publicProfileDialog" class="feature-dialog"><div class="panel-heading"><h3 id="publicProfileName">Perfil</h3><button class="icon-btn" id="closePublicProfile" type="button" aria-label="Cerrar">✕</button></div><div id="publicProfileContent" class="feature-grid"></div></dialog>  <dialog id="reportDialog" class="feature-dialog"><div class="panel-heading"><h3>Reportar etapa</h3><button class="icon-btn" id="closeReport" type="button" aria-label="Cerrar">✕</button></div><form id="reportForm" class="feature-form"><label>Motivo<select id="reportReason"><option value="inaccurate">Contenido inexacto</option><option value="inappropriate">Contenido inapropiado</option><option value="spam">Spam</option><option value="copyright">Derechos de autor</option><option value="other">Otro</option></select></label><label>Detalles<textarea id="reportDetails" maxlength="500" rows="4"></textarea></label><button class="danger-btn" type="submit">Enviar reporte</button><p id="reportFeedback" class="account-feedback" role="status"></p></form></dialog>  <dialog id="stagePlayDialog" class="feature-dialog"><div class="panel-heading"><h3 id="stagePlayTitle">Etapa</h3><button class="icon-btn" id="closeStagePlay" type="button" aria-label="Cerrar">✕</button></div><p id="stagePlayDescription" class="muted"></p><ol id="stagePlayPrompts"></ol><div class="camera-actions"><button class="primary-btn" id="completeStagePlay" type="button">Marcar como completada</button><button class="secondary-btn" id="reportStage" type="button">Reportar</button></div><div id="stageReviewControls" class="camera-actions" hidden><select id="stageRating"><option value="5">5 estrellas</option><option value="4">4 estrellas</option><option value="3">3 estrellas</option><option value="2">2 estrellas</option><option value="1">1 estrella</option></select><button class="secondary-btn" id="submitStageReview" type="button">Valorar</button><button class="secondary-btn" id="favoriteStage" type="button">Guardar favorito</button></div><p id="stagePlayStatus" class="account-feedback" role="status"></p></dialog>  <!-- CUENTA Y SINCRONIZACIÓN -->
+  <dialog id="accountDialog" aria-labelledby="accountTitle">
+    <div class="panel-heading"><h3 id="accountTitle">Tu cuenta</h3><button class="icon-btn" id="closeAccount" type="button" aria-label="Cerrar">✕</button></div>
+    <section id="accountAuthView">
+      <p class="muted" id="accountModeLabel">Inicia sesión</p>
+      <form id="accountForm">
+        <label class="account-field" id="accountNameFields" hidden>Nombre visible<input id="accountDisplayName" maxlength="40" autocomplete="nickname"></label>
+        <label class="account-field" id="accountUsernameField" hidden>Nombre de jugador<input id="accountUsername" maxlength="20" autocomplete="username" pattern="[A-Za-z0-9_]{3,20}"></label>
+        <label class="account-field" id="accountEmailField">Correo electrónico<input id="accountEmail" type="email" required autocomplete="email"></label>
+        <label class="account-field" id="accountPasswordFields">Contraseña<input id="accountPassword" type="password" minlength="8" autocomplete="current-password"></label>
+        <label class="account-field" id="accountRecoveryFields" hidden>Nueva contraseña<input id="accountNewPassword" type="password" minlength="8" autocomplete="new-password"></label>
+        <div class="camera-actions">
+          <button class="primary-btn" id="accountSubmit" type="submit">Iniciar sesión</button>
+          <button class="secondary-btn" id="accountSwitchMode" type="button">Crear cuenta</button>
+        </div>
+      </form>
+      <button class="account-link" id="accountForgot" type="button">Recuperar contraseña</button>
+    </section>
+    <section id="accountSignedInView" hidden>
+      <p id="accountIdentity"></p>
+      <p class="muted">Tu progreso de aprendizaje se sincroniza con esta cuenta.</p>
+      <button class="secondary-btn" id="accountSignOut" type="button">Cerrar sesión</button>
+    </section>
+    <p class="account-feedback" id="accountFeedback" role="status" aria-live="polite"></p>
+  </dialog>
+  <!-- NIVEL COMPLETADO -->
+  <div class="levelfx" id="levelFx" role="dialog" aria-modal="true" aria-labelledby="lfTitle" hidden>
+    <div class="lf-card">
+      <div class="lf-conf" id="lfConf" aria-hidden="true"></div>
+      <div class="lf-star" aria-hidden="true">★</div>
+      <h2 id="lfTitle">¡Nivel completado!</h2>
+      <p class="lf-name" id="lfName"></p>
+      <div class="lf-pts"><b id="lfPts">+0</b><span>puntos</span></div>
+      <p class="lf-next" id="lfNext"></p>
+      <div class="lf-actions">
+        <button class="primary-btn" id="lfGo" type="button">Siguiente nivel ▶</button>
+        <button class="secondary-btn" id="lfStay" type="button">Quedarme aquí</button>
+      </div>
+      <div class="lf-timer" id="lfTimer" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <!-- NOTIFICACIONES -->
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <!-- DATOS PRIMERO, LÓGICA DESPUÉS -->
+  <script type="module" src="script.js"></script>
+
+</body>
+</html>

@@ -2,18 +2,17 @@
 
 create table public.player_settings (
   user_id uuid primary key references public.profiles(id) on delete cascade,
-  show_profile boolean not null default true,
-  show_xp boolean not null default true,
+  show_profile boolean not null default false,
+  show_xp boolean not null default false,
   show_activity boolean not null default false,
   updated_at timestamptz not null default now()
 );
 create or replace function public.is_profile_public(profile_id uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
-  select coalesce((select ps.show_profile from public.player_settings ps where ps.user_id=profile_id),true)
+  select coalesce((select ps.show_profile from public.player_settings ps where ps.user_id=profile_id),false)
 $$;
 drop policy if exists "Public profiles are viewable" on public.profiles;
-create policy "Visible profiles are viewable" on public.profiles for select
-  using((select auth.uid())=id or public.is_profile_public(id));
+drop policy if exists "Visible profiles are viewable" on public.profiles;
 alter table public.player_settings enable row level security;
 revoke all on public.player_settings from anon,authenticated;
 grant select,update on public.player_settings to authenticated;
@@ -23,7 +22,9 @@ create policy "Players update own settings" on public.player_settings for update
 create table public.player_wallets (
   user_id uuid primary key references public.profiles(id) on delete cascade,
   xp_total bigint not null default 0 check(xp_total>=0),
+  verified_xp_total bigint not null default 0 check(verified_xp_total>=0),
   coin_balance bigint not null default 0 check(coin_balance>=0),
+  verified_coin_balance bigint not null default 0 check(verified_coin_balance>=0),
   updated_at timestamptz not null default now()
 );
 create table public.activity_catalog (
@@ -40,6 +41,8 @@ create table public.experience_transactions (
   activity_id text not null references public.activity_catalog(activity_id),
   amount integer not null check(amount>0),
   created_at timestamptz not null default now(),
+  verified boolean not null default false,
+  verified_at timestamptz,
   unique(user_id,activity_id)
 );
 create table public.coin_transactions (
@@ -49,7 +52,16 @@ create table public.coin_transactions (
   amount integer not null check(amount<>0),
   reason text not null check(reason in ('activity','daily_mission','purchase','moderation_reward')),
   created_at timestamptz not null default now(),
+  verified boolean not null default false,
+  verified_at timestamptz,
   unique(user_id,idempotency_key)
+);
+create table public.verified_activity_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  activity_id text not null references public.activity_catalog(activity_id),
+  verified_at timestamptz not null default now(),
+  unique(user_id,activity_id)
 );
 insert into public.activity_catalog values
 ('letter:A','letter','A',10,2),('letter:B','letter','B',10,2),('letter:C','letter','C',10,2),('letter:D','letter','D',10,2),('letter:E','letter','E',10,2),('letter:F','letter','F',10,2),('letter:G','letter','G',10,2),('letter:H','letter','H',10,2),('letter:I','letter','I',10,2),('letter:J','letter','J',10,2),('letter:K','letter','K',10,2),('letter:L','letter','L',10,2),('letter:M','letter','M',10,2),('letter:N','letter','N',10,2),('letter:O','letter','O',10,2),('letter:P','letter','P',10,2),('letter:Q','letter','Q',10,2),('letter:R','letter','R',10,2),('letter:S','letter','S',10,2),('letter:T','letter','T',10,2),('letter:U','letter','U',10,2),('letter:V','letter','V',10,2),('letter:W','letter','W',10,2),('letter:X','letter','X',10,2),('letter:Y','letter','Y',10,2),('letter:Z','letter','Z',10,2),
@@ -103,6 +115,8 @@ insert into public.player_inventory(user_id,item_id) select p.id,a.id from publi
 
 alter table public.player_settings enable row level security;
 alter table public.player_wallets enable row level security;
+alter table public.activity_catalog enable row level security;
+alter table public.verified_activity_events enable row level security;
 alter table public.experience_transactions enable row level security;
 alter table public.coin_transactions enable row level security;
 alter table public.avatar_items enable row level security;
@@ -111,13 +125,12 @@ alter table public.player_avatar enable row level security;
 alter table public.player_achievements enable row level security;
 alter table public.mission_claims enable row level security;
 revoke all on public.player_wallets,public.experience_transactions,public.coin_transactions,public.player_inventory,
-  public.player_avatar,public.player_achievements,public.mission_claims,public.activity_catalog from anon,authenticated;
+  public.player_avatar,public.player_achievements,public.mission_claims,public.activity_catalog,public.verified_activity_events from anon,authenticated;
 revoke all on public.player_settings from anon,authenticated;
 grant select,update on public.player_settings to authenticated;
+
 grant select on public.avatar_items to anon,authenticated;
 grant select on public.player_inventory,public.player_avatar,public.player_achievements to authenticated;
-create policy "Players read own settings" on public.player_settings for select to authenticated using((select auth.uid())=user_id);
-create policy "Players update own settings" on public.player_settings for update to authenticated using((select auth.uid())=user_id) with check((select auth.uid())=user_id);
 create policy "Catalog items are public" on public.avatar_items for select using(active);
 create policy "Players read own inventory" on public.player_inventory for select to authenticated using((select auth.uid())=user_id);
 create policy "Players read own avatar" on public.player_avatar for select to authenticated using((select auth.uid())=user_id);
@@ -125,25 +138,10 @@ create policy "Players read own achievements" on public.player_achievements for 
 
 create or replace function public.claim_learning_completion(p_activity_type text,p_activity_key text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare actor uuid:=auth.uid(); item public.activity_catalog%rowtype; wallet public.player_wallets%rowtype; inserted_id bigint; coins integer:=0;
+declare actor uuid:=auth.uid();
 begin
   if actor is null then raise exception 'Authentication required'; end if;
-  select * into item from public.activity_catalog where activity_type=p_activity_type and activity_key=p_activity_key;
-  if not found then raise exception 'Unknown learning activity'; end if;
-  insert into public.player_wallets(user_id) values(actor) on conflict do nothing;
-  select * into wallet from public.player_wallets where user_id=actor for update;
-  insert into public.experience_transactions(user_id,activity_id,amount) values(actor,item.activity_id,item.xp_reward)
-    on conflict(user_id,activity_id) do nothing returning id into inserted_id;
-  if inserted_id is null then return jsonb_build_object('awarded',false,'xp_total',wallet.xp_total,'coin_balance',wallet.coin_balance); end if;
-  update public.player_wallets set xp_total=xp_total+item.xp_reward,updated_at=now() where user_id=actor returning * into wallet;
-  if coalesce((select sum(amount) from public.coin_transactions where user_id=actor and amount>0 and created_at>=date_trunc('day',now())),0)+item.coin_reward<=100 and item.coin_reward>0 then
-    insert into public.coin_transactions(user_id,idempotency_key,amount,reason) values(actor,'activity:'||item.activity_id,item.coin_reward,'activity') on conflict do nothing;
-    if found then
-      update public.player_wallets set coin_balance=coin_balance+item.coin_reward,updated_at=now() where user_id=actor returning * into wallet;
-      coins:=item.coin_reward;
-    end if;
-  end if;
-  return jsonb_build_object('awarded',true,'xp_awarded',item.xp_reward,'coins_awarded',coins,'xp_total',wallet.xp_total,'coin_balance',wallet.coin_balance);
+  return jsonb_build_object('awarded',false,'rewards_enabled',false,'reason','server_validation_required');
 end $$;
 
 create or replace function public.purchase_avatar_item(p_item_key text)
@@ -156,13 +154,13 @@ begin
   insert into public.player_wallets(user_id) values(actor) on conflict do nothing;
   select * into wallet from public.player_wallets where user_id=actor for update;
   if exists(select 1 from public.player_inventory where user_id=actor and item_id=item.id) then raise exception 'Item already owned'; end if;
-  if wallet.coin_balance<item.price then raise exception 'Not enough coins'; end if;
+  if wallet.verified_coin_balance<item.price then raise exception 'Not enough verified coins'; end if;
   if item.price>0 then
-    insert into public.coin_transactions(user_id,idempotency_key,amount,reason) values(actor,'purchase:'||item.item_key,-item.price,'purchase');
-    update public.player_wallets set coin_balance=coin_balance-item.price,updated_at=now() where user_id=actor returning * into wallet;
+    insert into public.coin_transactions(user_id,idempotency_key,amount,reason,created_at,verified,verified_at) values(actor,'purchase:'||item.item_key,-item.price,'purchase',now(),true,now());
+    update public.player_wallets set coin_balance=verified_coin_balance-item.price,verified_coin_balance=verified_coin_balance-item.price,updated_at=now() where user_id=actor returning * into wallet;
   end if;
   insert into public.player_inventory(user_id,item_id) values(actor,item.id);
-  return jsonb_build_object('item_key',item.item_key,'coin_balance',wallet.coin_balance);
+  return jsonb_build_object('item_key',item.item_key,'coin_balance',wallet.verified_coin_balance);
 end $$;
 create or replace function public.equip_avatar_item(p_item_key text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -177,48 +175,77 @@ begin
 end $$;
 create or replace function public.claim_daily_mission()
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare actor uuid:=auth.uid(); wallet public.player_wallets%rowtype; today date:=current_date; key text:='daily:'||current_date::text;
+declare actor uuid:=auth.uid(); wallet public.player_wallets%rowtype; today date:=(now() at time zone 'UTC')::date; key text:='daily:'||(now() at time zone 'UTC')::date::text; inserted_id bigint;
 begin
   if actor is null then raise exception 'Authentication required'; end if;
-  if (select count(*) from public.experience_transactions where user_id=actor and created_at>=date_trunc('day',now()))<3 then raise exception 'Complete three learning activities first'; end if;
+  if (select count(*) from public.experience_transactions where user_id=actor and verified and created_at >= ((date_trunc('day',now() at time zone 'UTC')) at time zone 'UTC'))<3 then raise exception 'Complete three learning activities first'; end if;
   insert into public.mission_claims(user_id,mission_key,period_start) values(actor,'daily_three_activities',today) on conflict do nothing;
   if not found then raise exception 'Mission already claimed'; end if;
   insert into public.player_wallets(user_id) values(actor) on conflict do nothing;
   select * into wallet from public.player_wallets where user_id=actor for update;
-  insert into public.coin_transactions(user_id,idempotency_key,amount,reason) values(actor,key,25,'daily_mission') on conflict do nothing;
-  if found then update public.player_wallets set coin_balance=coin_balance+25,updated_at=now() where user_id=actor returning * into wallet; end if;
-  return jsonb_build_object('coin_balance',wallet.coin_balance,'reward',25);
+  insert into public.coin_transactions(user_id,idempotency_key,amount,reason,verified,verified_at) values(actor,key,25,'daily_mission',true,now()) on conflict do nothing returning id into inserted_id;
+  if inserted_id is not null then update public.player_wallets set verified_coin_balance=verified_coin_balance+25,updated_at=now() where user_id=actor returning * into wallet; end if;
+  return jsonb_build_object('coin_balance',wallet.verified_coin_balance,'reward',25);
 end $$;
 create or replace function public.get_my_v2_profile()
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare actor uuid:=auth.uid(); result jsonb;
 begin
   if actor is null then raise exception 'Authentication required'; end if;
-  select jsonb_build_object('profile',to_jsonb(p),'xp_total',coalesce(w.xp_total,0),'coin_balance',coalesce(w.coin_balance,0),
+  select jsonb_build_object('profile',jsonb_build_object('username',p.username,'display_name',p.display_name,'avatar_url',p.avatar_url,'created_at',p.created_at),'xp_total',coalesce(w.verified_xp_total,0),'coin_balance',coalesce(w.verified_coin_balance,0),
     'settings',to_jsonb(ps),'equipped',coalesce(pa.equipped_items,'{}'::jsonb)) into result
   from public.profiles p left join public.player_wallets w on w.user_id=p.id left join public.player_settings ps on ps.user_id=p.id
   left join public.player_avatar pa on pa.user_id=p.id where p.id=actor;
   return result;
 end $$;
 create or replace function public.get_leaderboard(p_weekly boolean default false)
-returns table(username text,display_name text,avatar_url text,score bigint,position bigint)
+returns table(
+  username text,
+  display_name text,
+  avatar_url text,
+  score bigint,
+  "position" bigint
+)
 language sql stable security definer set search_path = '' as $$
   with scores as (
     select p.username,p.display_name,p.avatar_url,
-      case when p_weekly then coalesce(sum(et.amount),0)::bigint else coalesce(w.xp_total,0) end total
-    from public.profiles p join public.player_settings ps on ps.user_id=p.id and ps.show_profile and ps.show_xp
+      case
+        when p_weekly then coalesce(sum(et.amount),0)::bigint
+        else coalesce(w.verified_xp_total,0)
+      end total
+    from public.profiles p
+    join public.player_settings ps
+      on ps.user_id=p.id and ps.show_profile and ps.show_xp
     left join public.player_wallets w on w.user_id=p.id
-    left join public.experience_transactions et on et.user_id=p.id and p_weekly and et.created_at>=now()-interval '7 days'
-    group by p.id,p.username,p.display_name,p.avatar_url,p_weekly,w.xp_total
-  ) select s.username,s.display_name,s.avatar_url,s.total,row_number() over(order by s.total desc,s.username)::bigint
-  from scores s order by s.total desc,s.username limit 100
+    left join public.experience_transactions et
+      on et.user_id=p.id
+      and p_weekly
+      and et.verified
+      and et.created_at>=now()-interval '7 days'
+    group by p.id,p.username,p.display_name,p.avatar_url,
+      p_weekly,w.verified_xp_total
+  )
+  select
+    s.username,
+    s.display_name,
+    s.avatar_url,
+    s.total,
+    row_number() over(order by s.total desc,s.username)::bigint
+  from scores s
+  order by s.total desc,s.username
+  limit 100
 $$;
 
 revoke all on function public.is_profile_public(uuid) from public;
 revoke all on function public.claim_learning_completion(text,text),public.purchase_avatar_item(text),public.equip_avatar_item(text),public.claim_daily_mission(),public.get_my_v2_profile() from public,anon;
 revoke all on function public.get_leaderboard(boolean) from public;
-grant execute on function public.is_profile_public(uuid),public.get_leaderboard(boolean) to anon,authenticated;
+revoke all on function public.is_profile_public(uuid),public.get_leaderboard(boolean) from anon,authenticated;
 grant execute on function public.claim_learning_completion(text,text),public.purchase_avatar_item(text),public.equip_avatar_item(text),public.claim_daily_mission(),public.get_my_v2_profile() to authenticated;
 insert into public.activity_catalog values
 ('phrase:HOLA, ¿COMO ESTAS?','phrase','HOLA, ¿COMO ESTAS?',20,4),('phrase:MUCHO GUSTO','phrase','MUCHO GUSTO',20,4),('phrase:BUENOS DIAS','phrase','BUENOS DIAS',20,4),('phrase:BUENAS NOCHES','phrase','BUENAS NOCHES',20,4),('phrase:MI NOMBRE ES...','phrase','MI NOMBRE ES...',20,4),('phrase:¿COMO TE LLAMAS?','phrase','¿COMO TE LLAMAS?',20,4),('phrase:SOY DE MEXICO','phrase','SOY DE MEXICO',20,4),('phrase:MUCHO GUSTO EN CONOCERTE','phrase','MUCHO GUSTO EN CONOCERTE',20,4),('phrase:POR FAVOR','phrase','POR FAVOR',20,4),('phrase:MUCHAS GRACIAS','phrase','MUCHAS GRACIAS',20,4),('phrase:¿PUEDES AYUDARME?','phrase','¿PUEDES AYUDARME?',20,4),('phrase:NO ENTIENDO','phrase','NO ENTIENDO',20,4),('phrase:QUIERO APRENDER','phrase','QUIERO APRENDER',20,4),('phrase:ESTOY ESTUDIANDO','phrase','ESTOY ESTUDIANDO',20,4),('phrase:ME GUSTA APRENDER','phrase','ME GUSTA APRENDER',20,4),('phrase:¿PUEDES REPETIR?','phrase','¿PUEDES REPETIR?',20,4),('phrase:HOLA, MI NOMBRE ES...','phrase','HOLA, MI NOMBRE ES...',20,4),('phrase:ESTOY APRENDIENDO LSM','phrase','ESTOY APRENDIENDO LSM',20,4),('phrase:GRACIAS POR TU AYUDA','phrase','GRACIAS POR TU AYUDA',20,4),('phrase:ME GUSTA COMUNICARME CONTIGO','phrase','ME GUSTA COMUNICARME CONTIGO',20,4)
 on conflict(activity_id) do nothing;
+
+
+
+
+

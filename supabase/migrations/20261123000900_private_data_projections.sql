@@ -1,6 +1,6 @@
 ﻿-- Phase 4 security hardening: return public projections instead of exposing Auth UUIDs.
 revoke select,insert,update on public.profiles from anon,authenticated;
-grant update(username,display_name,avatar_url) on public.profiles to authenticated;
+revoke all on public.profiles from anon,authenticated;
 drop policy if exists "Visible profiles are viewable" on public.profiles;
 create policy "Players can view their own profile row" on public.profiles for select to authenticated
  using((select auth.uid())=id);
@@ -13,7 +13,7 @@ declare actor uuid:=auth.uid(); result jsonb;
 begin
  if actor is null then raise exception 'Authentication required'; end if;
  select jsonb_build_object('profile',jsonb_build_object('username',p.username,'display_name',p.display_name,'avatar_url',p.avatar_url,'created_at',p.created_at),
-  'xp_total',coalesce(w.xp_total,0),'coin_balance',coalesce(w.coin_balance,0),'settings',to_jsonb(ps),'equipped',coalesce(pa.equipped_items,'{}'::jsonb))
+  'xp_total',coalesce(w.verified_xp_total,0),'coin_balance',coalesce(w.verified_coin_balance,0),'settings',to_jsonb(ps),'equipped',coalesce(pa.equipped_items,'{}'::jsonb))
  into result from public.profiles p left join public.player_wallets w on w.user_id=p.id left join public.player_settings ps on ps.user_id=p.id
  left join public.player_avatar pa on pa.user_id=p.id where p.id=actor;
  return result;
@@ -81,5 +81,6 @@ revoke all on function public.get_my_v2_profile(),public.get_public_stage_cards(
 grant execute on function public.get_my_v2_profile() to authenticated;
 grant execute on function public.get_public_stage_cards(text,smallint,uuid[],text) to anon,authenticated;
 grant execute on function public.get_my_favorite_stage_cards(),public.get_my_stages(),public.get_my_challenges() to authenticated;
+
 
 

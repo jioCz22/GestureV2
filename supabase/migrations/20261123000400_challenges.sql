@@ -1,4 +1,4 @@
--- Phase 3: peer challenges with results derived from the server reward ledger.
+﻿-- Phase 3: peer challenges with results derived from the server reward ledger.
 create table public.player_challenges (
  id uuid primary key default gen_random_uuid(),creator_id uuid not null references public.profiles(id) on delete cascade,
  opponent_id uuid not null references public.profiles(id) on delete cascade,
@@ -27,7 +27,7 @@ returns jsonb language plpgsql security definer set search_path = '' as $$
 declare actor uuid:=auth.uid(); opponent uuid; cid uuid; code text;
 begin
  if actor is null then raise exception 'Authentication required'; end if;
- if p_activity_ids is null or cardinality(p_activity_ids) not between 1 and 20 then raise exception 'Choose 1–20 activities'; end if;
+ if p_activity_ids is null or cardinality(p_activity_ids) not between 1 and 20 then raise exception 'Choose 1â€“20 activities'; end if;
  if (select count(distinct k) from unnest(p_activity_ids) k)<>cardinality(p_activity_ids) then raise exception 'Remove duplicate activities'; end if;
  if exists(select 1 from unnest(p_activity_ids) k where not exists(select 1 from public.activity_catalog a where a.activity_id=k)) then raise exception 'Unknown challenge activity'; end if;
  select id into opponent from public.profiles where lower(username)=lower(trim(p_opponent_username)) and public.is_profile_public(id);
@@ -80,7 +80,7 @@ declare actor uuid:=auth.uid(); v_activity_id text; inserted_count integer;
 begin
  if actor is null then raise exception 'Authentication required'; end if;
  select activity_id into v_activity_id from public.activity_catalog where activity_type=p_activity_type and activity_key=p_activity_key;
- if activity is null then raise exception 'Unknown learning activity'; end if;
+ if v_activity_id is null then raise exception 'Unknown learning activity'; end if;
  insert into public.challenge_activity_completions(challenge_id,player_id,activity_id)
  select c.id,actor,v_activity_id from public.player_challenges c join public.challenge_participants cp on cp.challenge_id=c.id and cp.player_id=actor
  where c.expires_at>now() and v_activity_id=any(c.activity_ids) on conflict do nothing;
@@ -104,4 +104,5 @@ begin
  return jsonb_build_object('correct',correct,'total',total,'elapsed_seconds',greatest(0,elapsed));
 end $$;
 revoke all on function public.record_challenge_activity(text,text) from public,anon;
-grant execute on function public.record_challenge_activity(text,text) to authenticated;
+revoke all on function public.record_challenge_activity(text,text) from public,anon,authenticated;
+

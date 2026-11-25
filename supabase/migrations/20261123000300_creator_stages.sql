@@ -10,7 +10,7 @@ create table public.custom_stages (
 );
 create table public.stage_levels (
   id uuid primary key default gen_random_uuid(), stage_id uuid not null references public.custom_stages(id) on delete cascade,
-  order_index smallint not null check(order_index between 1 and 10), title text not null check(char_length(title) between 1 and 60),
+  order_index smallint not null check(order_index between 1 and 20), title text not null check(char_length(title) between 1 and 60),
   prompts text[] not null check(cardinality(prompts) between 2 and 20), unique(stage_id,order_index)
 );
 create index custom_stages_explorer_idx on public.custom_stages(status,created_at desc);
@@ -48,7 +48,7 @@ create policy "Players read own reports" on public.stage_reports for select to a
 create policy "Players submit reports" on public.stage_reports for insert to authenticated with check(reporter_id=(select auth.uid()));
 create policy "Players read reviews" on public.stage_reviews for select using(true);
 create policy "Players add reviews after a completion" on public.stage_reviews for insert to authenticated with check(reviewer_id=(select auth.uid()) and exists(select 1 from public.stage_attempts a where a.stage_id=stage_reviews.stage_id and a.player_id=(select auth.uid())));
-create policy "Players edit their reviews" on public.stage_reviews for update to authenticated using(reviewer_id=(select auth.uid()) and exists(select 1 from public.stage_attempts a where a.stage_id=stage_reviews.stage_id and a.player_id=(select auth.uid()))) with check(reviewer_id=(select auth.uid()));
+create policy "Players edit their reviews" on public.stage_reviews for update to authenticated using(reviewer_id=(select auth.uid()) and exists(select 1 from public.stage_attempts a where a.stage_id=stage_reviews.stage_id and a.player_id=(select auth.uid()))) with check(reviewer_id=(select auth.uid()) and exists(select 1 from public.stage_attempts a where a.stage_id=stage_reviews.stage_id and a.player_id=(select auth.uid())));
 create policy "Players read own favorites" on public.stage_favorites for select to authenticated using(user_id=(select auth.uid()));
 
 create or replace function public.create_draft_stage(p_title text,p_description text,p_category text,p_difficulty smallint,p_prompts text[])
@@ -60,7 +60,7 @@ begin
  if char_length(coalesce(p_description,''))>500 then raise exception 'Description is too long'; end if;
  if p_category not in ('alfabeto','palabras','frases','vocabulario') or p_difficulty not between 1 and 5 then raise exception 'Invalid stage settings'; end if;
  if p_prompts is null or cardinality(p_prompts) not between 2 and 20 then raise exception 'Provide 2–20 prompts'; end if;
- if exists(select 1 from unnest(p_prompts) x where char_length(trim(x)) not between 1 and 80 or x ~* '<|>|https?://|www\.') then raise exception 'A prompt is empty, too long, or contains markup or a link'; end if;
+ if exists(select 1 from unnest(p_prompts) x where x is null or char_length(trim(x)) not between 1 and 80 or x ~* '<|>|https?://|www\.') then raise exception 'A prompt is empty, too long, or contains markup or a link'; end if;
  insert into public.custom_stages(author_id,title,description,category,difficulty) values(actor,trim(p_title),coalesce(trim(p_description),''),p_category,p_difficulty) returning id into sid;
  insert into public.stage_levels(stage_id,order_index,title,prompts) values(sid,1,'Etapa inicial',p_prompts);
  return sid;
@@ -74,6 +74,11 @@ begin
  if not found then raise exception 'Stage not found'; end if;
  if stage.status not in ('draft','rejected') then raise exception 'Stage is already under review or published'; end if;
  if not exists(select 1 from public.stage_levels where stage_id=p_stage_id) then raise exception 'Add a level first'; end if;
+ if (select count(*) from public.stage_levels where stage_id=p_stage_id)>20
+    or (select min(order_index) from public.stage_levels where stage_id=p_stage_id)<>1
+    or (select max(order_index) from public.stage_levels where stage_id=p_stage_id)<>(select count(*) from public.stage_levels where stage_id=p_stage_id) then
+   raise exception 'Levels must be numbered contiguously from 1 to 20';
+ end if;
  if stage.title ~* '<|>|https?://|www\.' or stage.description ~* '<|>|https?://|www\.' then raise exception 'Remove markup and links before submission'; end if;
  update public.custom_stages set status='pending_review',moderation_note=null,updated_at=now() where id=p_stage_id;
  return 'pending_review';
@@ -95,6 +100,7 @@ declare actor uuid:=auth.uid();
 begin
  if actor is null then raise exception 'Authentication required'; end if;
  if p_reason not in ('inaccurate','inappropriate','spam','copyright','other') then raise exception 'Invalid report reason'; end if;
+ if not exists(select 1 from public.custom_stages where id=p_stage_id and status='published') then raise exception 'Only published stages can be reported'; end if;
  insert into public.stage_reports(stage_id,reporter_id,reason,details) values(p_stage_id,actor,p_reason,left(coalesce(p_details,''),500)) on conflict(stage_id,reporter_id) do nothing;
 end $$;
 create or replace function public.record_stage_completion(p_stage_id uuid)
@@ -141,6 +147,7 @@ revoke all on function public.create_draft_stage(text,text,text,smallint,text[])
 grant execute on function public.create_draft_stage(text,text,text,smallint,text[]),public.submit_stage_for_review(uuid),
  public.moderate_stage(uuid,boolean,text),public.report_stage(uuid,text,text),public.record_stage_completion(uuid),
  public.review_stage(uuid,smallint),public.toggle_stage_favorite(uuid,boolean),public.get_moderation_queue() to authenticated;
+drop function if exists public.get_moderation_queue();
 create or replace function public.get_moderation_queue()
 returns table(stage_id uuid,title text,description text,author_username text,created_at timestamptz,report_count bigint,prompts text[],report_summary text)
 language plpgsql stable security definer set search_path = '' as $$
@@ -158,3 +165,6 @@ begin
 end $$;
 revoke all on function public.get_moderation_queue() from public,anon;
 grant execute on function public.get_moderation_queue() to authenticated;
+
+
+

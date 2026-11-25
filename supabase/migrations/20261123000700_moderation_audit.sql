@@ -3,7 +3,7 @@ create table public.moderation_actions(
  id bigint generated always as identity primary key,
  stage_id uuid not null references public.custom_stages(id) on delete cascade,
  moderator_id uuid not null references public.profiles(id) on delete cascade,
- action text not null check(action in ('approved','rejected')),
+ action text not null check(action in ('approved','rejected','suspended')),
  note text not null default '',created_at timestamptz not null default now()
 );
 alter table public.moderation_actions enable row level security;
@@ -24,3 +24,5 @@ begin
 end $$;
 revoke all on function public.moderate_stage(uuid,boolean,text) from public,anon;
 grant execute on function public.moderate_stage(uuid,boolean,text) to authenticated;
+
+

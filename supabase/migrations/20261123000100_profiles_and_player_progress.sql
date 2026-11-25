@@ -62,20 +62,12 @@ alter table public.player_progress enable row level security;
 
 revoke all on public.profiles from anon, authenticated;
 revoke all on public.player_progress from anon, authenticated;
-grant select on public.profiles to anon, authenticated;
-grant insert, update on public.profiles to authenticated;
+-- Profile rows are accessed only through privacy-aware SECURITY DEFINER projections.
+revoke all on public.profiles from anon, authenticated;
 grant select, insert, update, delete on public.player_progress to authenticated;
 
 drop policy if exists "Public profiles are viewable" on public.profiles;
-create policy "Public profiles are viewable"
-  on public.profiles for select
-  using (true);
-
 drop policy if exists "Players can update their profile" on public.profiles;
-create policy "Players can update their profile"
-  on public.profiles for update to authenticated
-  using ((select auth.uid()) = id)
-  with check ((select auth.uid()) = id);
 
 drop policy if exists "Players can read their progress" on public.player_progress;
 create policy "Players can read their progress"

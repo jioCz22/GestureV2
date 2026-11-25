@@ -146,6 +146,15 @@ import { appEvents } from "./app-events.js";
       host.append(row);
     });
   }
+  const flagNames={insult:"Insulto",sexual:"Contenido sexual",threat:"Amenaza",hate:"Odio",terminology:"Terminología ofensiva",spam:"Spam",lsm:"Validar LSM"};
+  function flagLabel(flag){const[type,detail]=String(flag).split(":");if(type==="lsm")return"Requiere validación lingüística";if(type==="spam"&&detail==="repeated_prompts")return"Spam: indicaciones repetidas";if(type==="spam"&&detail==="character_repeat")return"Spam: caracteres repetidos";return(flagNames[type]||type)+(detail?" ("+detail+")":"");}
+  async function loadNotifications(){
+    const host=$("notificationList");if(!host)return;host.replaceChildren();if(!currentUser())return;
+    try{const rows=await rpc("get_my_notifications");
+      if(!rows?.length){host.append(node("p","muted","No tienes notificaciones."));return;}
+      rows.forEach(n=>{const row=node("div","history-item"+(n.read_at?"":" unread"));row.append(node("strong","",n.title),node("span","muted",n.body||""),node("small","muted",new Date(n.created_at).toLocaleDateString("es-MX")));host.append(row);});
+    }catch(_){host.append(node("p","muted","No se pudieron cargar las notificaciones."));}
+  }
   let moderatorCache={id:null,value:false};
   async function isModerator(){
     const user=currentUser();if(!user)return false;
@@ -166,9 +175,19 @@ import { appEvents } from "./app-events.js";
         card.append(node("p","",stage.description||""));
         card.append(node("p","",(stage.prompts||[]).join(" · ")));
         card.append(node("small","muted",stage.report_summary||""));
-        [[true,"Aprobar"],[false,"Rechazar"]].forEach(([approved,label])=>{
-          const button=node("button",approved?"primary-btn":"danger-btn",label);
-          button.onclick=async()=>{try{const note=approved?"":(prompt("Motivo del rechazo (máximo 500 caracteres):")||"");await rpc("moderate_stage",{p_stage_id:stage.stage_id,p_approved:approved,p_note:note});await loadModeration();}catch(error){showMessage(error.message||"No se pudo moderar.");}};
+        const flags=stage.auto_flags||[];
+        card.append(node("small","muted","Estado: "+(stage.status==="published"?"Publicada con denuncias":"Pendiente de revisión")));
+        if(flags.length)card.append(node("p","muted","Alertas automáticas: "+flags.map(flagLabel).join(" · ")));
+        if(stage.is_own){card.append(node("small","muted","Es tu propia etapa: otro moderador debe revisarla."));host.append(card);return;}
+        const actions=stage.status==="published"?[["suspend","Suspender","danger-btn"]]:[["approve","Aprobar","primary-btn"],["reject","Rechazar / pedir cambios","danger-btn"]];
+        actions.forEach(([action,label,cls])=>{
+          const button=node("button",cls,label);
+          button.onclick=async()=>{try{
+            if(action==="approve")await rpc("moderate_stage",{p_stage_id:stage.stage_id,p_approved:true,p_note:""});
+            else{const note=prompt(action==="reject"?"Motivo o cambios solicitados (máximo 500 caracteres):":"Motivo de la suspensión (máximo 500 caracteres):");if(note===null)return;
+              if(action==="reject")await rpc("moderate_stage",{p_stage_id:stage.stage_id,p_approved:false,p_note:note});
+              else await rpc("suspend_reported_stage",{p_stage_id:stage.stage_id,p_note:note});}
+            await loadModeration();}catch(error){showMessage(error.message||"No se pudo moderar.");}};
           card.append(button);
         });
         host.append(card);
@@ -185,7 +204,7 @@ import { appEvents } from "./app-events.js";
       const own=await dbClient();const result=await own.from("player_achievements").select("achievement_key,earned_at");if(result.error)throw result.error;
       const grid=$("achievementList");grid.replaceChildren();
       Object.entries(achievements).forEach(([key,value])=>{const unlocked=(result.data||[]).some(x=>x.achievement_key===key);const card=node("article","feature-card "+(unlocked?"":"locked"));card.append(node("strong","",(unlocked?"🏅":"○")+" "+value[0]),node("small","",value[1]));grid.append(card);});
-      const stats=await rpc("get_creator_stats");const cs=$("creatorStats");cs.replaceChildren();[["Etapas creadas",stats.created||0],["Publicadas",stats.published||0],["En revisión",stats.pending||0],["Participaciones",stats.participants||0]].forEach(([label,value])=>{const card=node("article","feature-card");card.append(node("strong","",String(value)),node("small","",label));cs.append(card);});
+      const stats=await rpc("get_creator_stats");const cs=$("creatorStats");cs.replaceChildren();[["Etapas creadas",stats.created||0],["Publicadas",stats.published||0],["En revisión",stats.pending||0],["Participaciones",stats.participants||0]].forEach(([label,value])=>{const card=node("article","feature-card");card.append(node("strong","",String(value)),node("small","",label));cs.append(card);});await loadNotifications();
     }catch(error){status("profileSummary",error.message||"No se pudo cargar el perfil.");}
   }
 
@@ -212,6 +231,7 @@ import { appEvents } from "./app-events.js";
     }catch(error){showMessage(error.message||"No se pudieron cargar los datos.");}
   }
   function bind(){
+    $("markNotificationsRead").onclick=async()=>{try{await rpc("mark_notifications_read");await loadNotifications();}catch(e){showMessage(e.message||"No se pudo actualizar.");}};
     $("startAssessment").onclick=startAssessment;$("submitAssessment").onclick=submitAssessment;
     ["stageSort","stageCategory","stageDifficulty"].forEach(id=>$(id).addEventListener("change",loadCommunity));$("refreshStages").onclick=loadCommunity;
     document.querySelectorAll("[data-rank-period]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-rank-period]").forEach(x=>x.classList.toggle("active",x===b));weeklyRank=b.dataset.rankPeriod==="true";loadLeaderboard();});$("rankMetric").onchange=()=>loadLeaderboard();$("refreshFavorites").onclick=()=>loadFavorites().catch(e=>showMessage(e.message));$("closePublicProfile").onclick=()=>$("publicProfileDialog").close();

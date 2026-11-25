@@ -24,7 +24,7 @@ import { appEvents } from "./app-events.js";
     if(!ECONOMY_REWARDS_ENABLED || !currentUser())return;
     const activity_type={letters:"letter",words:"word",phrases:"phrase"}[type];
     if(!activity_type)return;
-    try{const result=await rpc("claim_learning_completion",{p_activity_type:activity_type,p_activity_key:key});await loadWallet();if(result?.awarded)showMessage(`+${result.xp_awarded} XP Â· +${result.coins_awarded} monedas`);}
+    try{const result=await rpc("claim_learning_completion",{p_activity_type:activity_type,p_activity_key:key});await loadWallet();if(result?.awarded)showMessage(`+${result.xp_awarded} XP · +${result.coins_awarded} monedas`);}
     catch(error){console.warn("No se pudo registrar la recompensa:",error);showMessage("No se pudo sincronizar la recompensa.");}
   }
   async function onLearningCompletion(type, key, isFirstCompletion) {
@@ -64,7 +64,7 @@ import { appEvents } from "./app-events.js";
     const filter=$("avatarCategory").value;
     catalog.filter(i=>!filter||i.category===filter).forEach(item=>{
       const card=node("article","feature-card item-card");const swatch=node("span","item-swatch");swatch.style.backgroundColor=item.color_hex;
-      const title=node("strong","",item.display_name);const meta=node("small","muted",`${categoryNames[item.category]||item.category} Â· ${inventory.has(item.item_key)?"En inventario":`${item.price} monedas`}`);
+      const title=node("strong","",item.display_name);const meta=node("small","muted",`${categoryNames[item.category]||item.category} · ${inventory.has(item.item_key)?"En inventario":`${item.price} monedas`}`);
       const button=node("button",inventory.has(item.item_key)?"secondary-btn":"primary-btn",inventory.has(item.item_key)?(equipped[item.category]===item.item_key?"Equipado":"Equipar"):(ECONOMY_REWARDS_ENABLED?"Comprar · "+item.price+" ◉":"Compras en pausa"));button.type="button";button.disabled=!inventory.has(item.item_key)&&!ECONOMY_REWARDS_ENABLED;
       button.addEventListener("click",async()=>{try{if(inventory.has(item.item_key))equipped=await rpc("equip_avatar_item",{p_item_key:item.item_key});else if(ECONOMY_REWARDS_ENABLED){await rpc("purchase_avatar_item",{p_item_key:item.item_key});showMessage("Artículo desbloqueado.");}else return;await loadShop();}catch(error){showMessage(error.message||"No se pudo completar la acción.");}});
       card.append(swatch,title,meta,button);host.append(card);
@@ -73,14 +73,16 @@ import { appEvents } from "./app-events.js";
   async function loadMission(){
     if(!ECONOMY_REWARDS_ENABLED){status("dailyMission","Recompensas en pausa: validación económica pendiente.");$("claimMission").disabled=true;return;}
     if(!currentUser()){status("dailyMission","Inicia sesión para consultar la misión.");$("claimMission").disabled=true;return;}
-    const m=await rpc("get_daily_mission_status");$("dailyMission").textContent=`Completa ${m.completed} de ${m.target} actividades Â· recompensa: ${m.reward} monedas${m.claimed?" Â· Reclamada":""}`;$("claimMission").disabled=Boolean(m.claimed)||m.completed<m.target;
+    const m=await rpc("get_daily_mission_status");$("dailyMission").textContent=`Completa ${m.completed} de ${m.target} actividades · recompensa: ${m.reward} monedas${m.claimed?" · Reclamada":""}`;$("claimMission").disabled=Boolean(m.claimed)||m.completed<m.target;
   }
 
+  let leaderboardSeq=0;
+  const messageRow=text=>{const tr=node("tr"),td=node("td","muted",text);td.colSpan=3;tr.append(td);return tr;};
   async function loadLeaderboard(weekly=weeklyRank){
-    const body=$("leaderboardRows");body.replaceChildren();
-    try{const metric=$("rankMetric").value;$("rankScoreHeader").textContent=metric==="experience"?"XP":metric==="precision"?"Precisión":metric==="consistency"?"Días":"Progreso";const rows=await rpc("get_learning_leaderboard",{p_metric:metric,p_weekly:weekly});if(!rows?.length){body.append(node("tr","","No hay resultados todavía."));return;}
-      rows.forEach(row=>{const tr=node("tr");tr.append(node("td","rank-position",String(row.position)),node("td","",`${row.display_name} Â· @${row.username}`),node("td","",`${row.score} ${metric==="experience"?"XP":metric==="consistency"?"días":metric==="weekly_activity"?"actividades":metric==="precision"?"%":"contenidos"}`));body.append(tr);});
-    }catch(error){body.append(node("tr","",error.message||"No se pudo cargar la clasificación."));}
+    const seq=++leaderboardSeq;const body=$("leaderboardRows");body.replaceChildren();
+    try{const metric=$("rankMetric").value;$("rankScoreHeader").textContent=metric==="experience"?"XP":metric==="precision"?"Precisión":metric==="consistency"?"Días":"Progreso";const rows=await rpc("get_learning_leaderboard",{p_metric:metric,p_weekly:weekly});if(seq!==leaderboardSeq)return;if(!rows?.length){body.append(messageRow("No hay resultados todavía."));return;}
+      rows.forEach(row=>{const tr=node("tr");tr.append(node("td","rank-position",String(row.position)),node("td","",`${row.display_name} · @${row.username}`),node("td","",`${row.score} ${metric==="experience"?"XP":metric==="consistency"?"días":metric==="weekly_activity"?"actividades":metric==="precision"?"%":"contenidos"}`));body.append(tr);});
+    }catch(error){if(seq===leaderboardSeq)body.append(messageRow(error.message||"No se pudo cargar la clasificación."));}
   }
 
   async function startAssessment(){
@@ -90,7 +92,7 @@ import { appEvents } from "./app-events.js";
     }catch(error){status("assessmentResult",error.message||"Inicia sesión para evaluar tu aprendizaje.");}
   }
   async function submitAssessment(){
-    try{requireUser();if(!assessmentSession||assessmentAnswers.size!==assessmentQuestions.length)throw new Error("Responde todas las preguntas.");const answers=[...assessmentAnswers].map(([id,answer])=>({id,answer}));const result=await rpc("submit_learning_assessment",{p_session_id:assessmentSession,p_answers:answers});status("assessmentResult",`Resultado: ${result.correct}/${result.total} Â· precisión ${result.accuracy_percent}%.`);assessmentSession=null;$("submitAssessment").disabled=true;$("startAssessment").disabled=false;await loadLeaderboard();}
+    try{requireUser();if(!assessmentSession||assessmentAnswers.size!==assessmentQuestions.length)throw new Error("Responde todas las preguntas.");const answers=[...assessmentAnswers].map(([id,answer])=>({id,answer}));const result=await rpc("submit_learning_assessment",{p_session_id:assessmentSession,p_answers:answers});status("assessmentResult",`Resultado: ${result.correct}/${result.total} · precisión ${result.accuracy_percent}%.`);assessmentSession=null;$("submitAssessment").disabled=true;$("startAssessment").disabled=false;await loadLeaderboard();}
     catch(error){status("assessmentResult",error.message||"No se pudo enviar la evaluación.");}
   }
   async function loadCommunity(){
@@ -100,9 +102,9 @@ import { appEvents } from "./app-events.js";
       if(!rows?.length){host.append(node("p","muted","Todavía no hay etapas publicadas."));return;}
       rows.forEach(stage=>{
         const card=node("article","feature-card stage-card"),h=node("h3","",stage.title);
-        const author=`${stage.author_display_name||"Jugador"}${stage.author_username?` Â· @${stage.author_username}`:""}`;
+        const author=`${stage.author_display_name||"Jugador"}${stage.author_username?` · @${stage.author_username}`:""}`;
         const summary=node("p","muted",stage.description||"Etapa de la comunidad");
-        const info=node("small","muted",`${stage.category} Â· dificultad ${stage.difficulty}/5 Â· ${(stage.prompts||[]).length} indicaciones Â· ${stage.play_count} participantes Â· ★ ${Number(stage.average_rating||0).toFixed(1)}`);
+        const info=node("small","muted",`${stage.category} · dificultad ${stage.difficulty}/5 · ${(stage.prompts||[]).length} indicaciones · ${stage.play_count} participantes · ★ ${Number(stage.average_rating||0).toFixed(1)}`);
         const actions=node("div","card-actions"),play=node("button","primary-btn","Jugar etapa");play.type="button";play.onclick=()=>openStage(stage);
         const authorLink=node("button","account-link",author);authorLink.type="button";authorLink.onclick=()=>openPublicProfile(stage.author_username);
         actions.append(play);card.append(h,authorLink,summary,info,actions);host.append(card);
@@ -124,7 +126,7 @@ import { appEvents } from "./app-events.js";
   async function openPublicProfile(username){
     if(!username)return;const host=$("publicProfileContent");host.replaceChildren();$("publicProfileName").textContent="Perfil público";$("publicProfileDialog").showModal();
     try{const info=await rpc("get_public_profile",{p_username:username});if(!info){host.append(node("p","muted","Este perfil no está disponible públicamente."));return;}
-      $("publicProfileName").textContent=`${info.display_name} Â· @${info.username}`;
+      $("publicProfileName").textContent=`${info.display_name} · @${info.username}`;
       [["Experiencia",info.xp_total===null?"Oculta":`${info.xp_total} XP`], ["Etapas creadas",info.stages_created], ["Etapas publicadas",info.stages_published]].forEach(([label,value])=>{const card=node("article","feature-card");card.append(node("strong","",String(value)),node("small","",label));host.append(card);});
     }catch(error){host.append(node("p","muted",error.message||"No se pudo cargar el perfil."));}
   }
@@ -135,7 +137,7 @@ import { appEvents } from "./app-events.js";
     if(!data?.length){host.append(node("p","muted","Aún no has creado etapas."));return;}
     data.forEach(stage=>{
       const row=node("div","history-item");
-      row.append(node("span","",stage.title),node("span","",stage.status+(stage.moderation_note?" Â· "+stage.moderation_note:"")));
+      row.append(node("span","",stage.title),node("span","",stage.status+(stage.moderation_note?" · "+stage.moderation_note:"")));
       if(["draft","rejected"].includes(stage.status)){
         const button=node("button","secondary-btn","Enviar a revisión");
         button.onclick=async()=>{try{await rpc("submit_stage_for_review",{p_stage_id:stage.id});showMessage("Enviada a revisión.");await loadMyStages();}catch(error){showMessage(error.message||"No se pudo enviar.");}};
@@ -144,17 +146,25 @@ import { appEvents } from "./app-events.js";
       host.append(row);
     });
   }
+  let moderatorCache={id:null,value:false};
+  async function isModerator(){
+    const user=currentUser();if(!user)return false;
+    if(moderatorCache.id===user.id)return moderatorCache.value;
+    try{moderatorCache={id:user.id,value:Boolean(await rpc("is_moderator"))};}
+    catch(_){return false;} // migración pendiente: no insistir con get_moderation_queue
+    return moderatorCache.value;
+  }
   async function loadModeration(){
     const panel=$("moderationPanel"),host=$("moderationQueue");panel.hidden=true;host.replaceChildren();if(!currentUser())return;
     try{
-      const rows=await rpc("get_moderation_queue");panel.hidden=false;
+      if(!(await isModerator()))return;const rows=await rpc("get_moderation_queue");panel.hidden=false;
       if(!rows?.length){host.append(node("p","muted","La cola está vacía."));return;}
       rows.forEach(stage=>{
         const card=node("article","feature-card");
         card.append(node("strong","",stage.title));
-        card.append(node("p","muted",(stage.author_username||"Jugador")+" Â· "+stage.report_count+" reportes"));
+        card.append(node("p","muted",(stage.author_username||"Jugador")+" · "+stage.report_count+" reportes"));
         card.append(node("p","",stage.description||""));
-        card.append(node("p","",(stage.prompts||[]).join(" Â· ")));
+        card.append(node("p","",(stage.prompts||[]).join(" · ")));
         card.append(node("small","muted",stage.report_summary||""));
         [[true,"Aprobar"],[false,"Rechazar"]].forEach(([approved,label])=>{
           const button=node("button",approved?"primary-btn":"danger-btn",label);
@@ -170,11 +180,11 @@ import { appEvents } from "./app-events.js";
     if(!currentUser()){$("profileSummary").textContent="Inicia sesión para ver tu perfil.";return;}
     try{
       const data=await rpc("get_my_v2_profile");wallet=data;
-      $("profileSummary").textContent=data.profile.display_name+" Â· @"+data.profile.username+" Â· nivel de XP "+(Math.floor((data.xp_total||0)/500)+1)+" Â· "+(data.xp_total||0)+" XP Â· "+(data.coin_balance||0)+" monedas";
+      $("profileSummary").textContent=data.profile.display_name+" · @"+data.profile.username+" · nivel de XP "+(Math.floor((data.xp_total||0)/500)+1)+" · "+(data.xp_total||0)+" XP · "+(data.coin_balance||0)+" monedas";
       $("settingShowProfile").checked=data.settings?.show_profile!==false;$("settingShowXp").checked=data.settings?.show_xp!==false;$("settingShowActivity").checked=Boolean(data.settings?.show_activity);
       const own=await dbClient();const result=await own.from("player_achievements").select("achievement_key,earned_at");if(result.error)throw result.error;
       const grid=$("achievementList");grid.replaceChildren();
-      Object.entries(achievements).forEach(([key,value])=>{const unlocked=(result.data||[]).some(x=>x.achievement_key===key);const card=node("article","feature-card "+(unlocked?"":"locked"));card.append(node("strong","",(unlocked?"🏅":"â—‹")+" "+value[0]),node("small","",value[1]));grid.append(card);});
+      Object.entries(achievements).forEach(([key,value])=>{const unlocked=(result.data||[]).some(x=>x.achievement_key===key);const card=node("article","feature-card "+(unlocked?"":"locked"));card.append(node("strong","",(unlocked?"🏅":"○")+" "+value[0]),node("small","",value[1]));grid.append(card);});
       const stats=await rpc("get_creator_stats");const cs=$("creatorStats");cs.replaceChildren();[["Etapas creadas",stats.created||0],["Publicadas",stats.published||0],["En revisión",stats.pending||0],["Participaciones",stats.participants||0]].forEach(([label,value])=>{const card=node("article","feature-card");card.append(node("strong","",String(value)),node("small","",label));cs.append(card);});
     }catch(error){status("profileSummary",error.message||"No se pudo cargar el perfil.");}
   }
@@ -184,10 +194,10 @@ import { appEvents } from "./app-events.js";
     const rows=await rpc("get_my_challenges");if(!rows?.length){host.append(node("p","muted","Todavía no tienes desafíos."));return;}
     rows.forEach(ch=>{
       const card=node("article","feature-card");
-      card.append(node("strong","","Código "+ch.join_code),node("small","muted",ch.activity_ids.length+" actividades Â· vence "+new Date(ch.expires_at).toLocaleDateString("es-MX")));
-      (ch.participants||[]).forEach(result=>card.append(node("p","",result.username+": "+result.correct_count+"/"+ch.activity_ids.length+" Â· "+(result.elapsed_seconds??"—")+" s")));
+      card.append(node("strong","","Código "+ch.join_code),node("small","muted",ch.activity_ids.length+" actividades · vence "+new Date(ch.expires_at).toLocaleDateString("es-MX")));
+      (ch.participants||[]).forEach(result=>card.append(node("p","",result.username+": "+result.correct_count+"/"+ch.activity_ids.length+" · "+(result.elapsed_seconds??"—")+" s")));
       const button=node("button","secondary-btn","Registrar mi resultado");
-      button.onclick=async()=>{try{const result=await rpc("complete_player_challenge",{p_challenge_id:ch.id});showMessage(result.correct+"/"+result.total+" actividades Â· "+result.elapsed_seconds+" s");await loadChallenges();}catch(error){showMessage(error.message||"No se pudo registrar el resultado.");}};
+      button.onclick=async()=>{try{const result=await rpc("complete_player_challenge",{p_challenge_id:ch.id});showMessage(result.correct+"/"+result.total+" actividades · "+result.elapsed_seconds+" s");await loadChallenges();}catch(error){showMessage(error.message||"No se pudo registrar el resultado.");}};
       card.append(button);host.append(card);
     });
   }

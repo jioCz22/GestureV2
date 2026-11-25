@@ -231,7 +231,7 @@ import { appEvents } from "./app-events.js";
     }catch(error){showMessage(error.message||"No se pudieron cargar los datos.");}
   }
   function bind(){
-    $("markNotificationsRead").onclick=async()=>{try{await rpc("mark_notifications_read");await loadNotifications();}catch(e){showMessage(e.message||"No se pudo actualizar.");}};
+    const markRead=$("markNotificationsRead");if(markRead)markRead.onclick=async()=>{try{await rpc("mark_notifications_read");await loadNotifications();}catch(e){showMessage(e.message||"No se pudo actualizar.");}};
     $("startAssessment").onclick=startAssessment;$("submitAssessment").onclick=submitAssessment;
     ["stageSort","stageCategory","stageDifficulty"].forEach(id=>$(id).addEventListener("change",loadCommunity));$("refreshStages").onclick=loadCommunity;
     document.querySelectorAll("[data-rank-period]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-rank-period]").forEach(x=>x.classList.toggle("active",x===b));weeklyRank=b.dataset.rankPeriod==="true";loadLeaderboard();});$("rankMetric").onchange=()=>loadLeaderboard();$("refreshFavorites").onclick=()=>loadFavorites().catch(e=>showMessage(e.message));$("closePublicProfile").onclick=()=>$("publicProfileDialog").close();

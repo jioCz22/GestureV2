@@ -475,3 +475,5 @@ select{min-height:38px;background:var(--s2);color:#fff;border:1px solid var(--li
 .assessment-choices{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .quiz-choice{min-height:42px;border:1px solid var(--line);border-radius:9px;background:var(--s1);color:#fff;font-weight:700;cursor:pointer}
 .quiz-choice.selected{background:var(--grad);border-color:transparent}
+
+.history-item.unread strong::before{content:"● ";color:#8b7cff}
